@@ -19,14 +19,12 @@
 *** along with Catapult. If not, see <http://www.gnu.org/licenses/>.
 **/
 
-#pragma once
-#include "catapult/plugins.h"
+#include "src/validators/Validators.h"
+#include "tests/test/plugins/ValidatorTestUtils.h"
+#include "tests/TestHarness.h"
 
-namespace catapult { namespace plugins { class PluginManager; } }
+namespace catapult { namespace validators {
 
-namespace catapult { namespace plugins {
+#define TEST_CLASS PriceMosaicsValidatorTests
 
-	/// Registers price support with \a manager.
-	PLUGIN_API
-	void RegisterPriceSubsystem(PluginManager& manager);
 }}

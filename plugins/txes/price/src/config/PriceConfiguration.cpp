@@ -19,14 +19,20 @@
 *** along with Catapult. If not, see <http://www.gnu.org/licenses/>.
 **/
 
-#pragma once
-#include "catapult/plugins.h"
+#include "PriceConfiguration.h"
+#include "catapult/utils/ConfigurationBag.h"
+#include "catapult/utils/ConfigurationUtils.h"
 
-namespace catapult { namespace plugins { class PluginManager; } }
+namespace catapult { namespace config {
 
-namespace catapult { namespace plugins {
+	PriceConfiguration PriceConfiguration::Uninitialized() {
+		return PriceConfiguration();
+	}
 
-	/// Registers price support with \a manager.
-	PLUGIN_API
-	void RegisterPriceSubsystem(PluginManager& manager);
+	PriceConfiguration PriceConfiguration::LoadFromBag(const utils::ConfigurationBag& bag) {
+		PriceConfiguration config;
+		utils::LoadIniProperty(bag, "", "MaxMessageSize", config.MaxMessageSize);
+		utils::VerifyBagSizeExact(bag, 1);
+		return config;
+	}
 }}
