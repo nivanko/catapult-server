@@ -117,7 +117,7 @@ namespace catapult { namespace plugins {
     }
 
     double getCoinGenerationMultiplier(uint64_t blockHeight, bool rollback) {
-        if (blockHeight % multiplierRecalculationFrequency  > 0 && !areSame(currentMultiplier, 0) != 0 && !rollback) // recalculate only every 720 blocks
+        if (blockHeight % multiplierRecalculationFrequency > 0 && !areSame(currentMultiplier, 0) != 0 && !rollback) // recalculate only every 720 blocks
             return currentMultiplier;
         else if (areSame(currentMultiplier, 0))
             currentMultiplier = 1;
@@ -189,7 +189,7 @@ namespace catapult { namespace plugins {
         return 1;
     }
 
-    uint64_t getFeeToPay(uint64_t blockHeight, bool rollback) {
+    uint64_t getFeeToPay(uint64_t blockHeight, bool rollback, std::string beneficiary) {
         uint64_t collectedEpochFees = 0;
         std::deque<std::tuple<uint64_t, uint64_t, uint64_t, std::string>>::reverse_iterator it;
         if (rollback) {
@@ -198,8 +198,9 @@ namespace catapult { namespace plugins {
                 return feeToPay;
             }
             for (it = catapult::plugins::epochFees.rbegin(); it != catapult::plugins::epochFees.rend(); ++it) {         
-                if (std::get<0>(*it) == blockHeight) {
+                if (std::get<0>(*it) == blockHeight && std::get<3>(*it) == beneficiary) {
                     feeToPay = std::get<2>(*it);
+                    break;
                 } else if (std::get<0>(*it) < blockHeight) {
                     feeToPay = 0;
                     break;
@@ -219,6 +220,14 @@ namespace catapult { namespace plugins {
                 }
             }
             feeToPay = static_cast<unsigned int>(static_cast<double>(collectedEpochFees) / static_cast<double>(feeRecalculationFrequency) + 0.5);
+        }
+        else if (feeToPay == 0 && blockHeight > feeRecalculationFrequency) {
+            for (it = catapult::plugins::epochFees.rbegin(); it != catapult::plugins::epochFees.rend(); ++it) {
+                if (blockHeight - 1 == std::get<0>(*it)) {
+                    feeToPay = std::get<2>(*it);
+                    break;
+                }
+            }
         }
         return feeToPay;
     }
@@ -795,15 +804,13 @@ namespace catapult { namespace plugins {
             if (previousEntryHeight > blockHeight) {
                 CATAPULT_LOG(warning) << "Warning: epoch fee entry block height is lower to the previous: " <<
                     "Previous height: " << previousEntryHeight << ", current height: " << blockHeight << "\n";
-                return false;
-            } else if (previousEntryHeight == blockHeight) {
-                for (unsigned int i = 0; i < prevAddresses.size(); ++i) {
-                    if (prevAddresses[i] == address) {
-                        CATAPULT_LOG(warning) << "Warning: skipping a duplicate epoch fee entry for block: " << blockHeight <<
-                            ", collected fees: " << collectedFees << ", currentFee: " << currentFee << ", address: " << address << "\n";
-                        return false;
+                
+                for (it = catapult::plugins::epochFees.rbegin(); it != catapult::plugins::epochFees.rend(); ++it) {
+                    if (std::get<0>(*it) <= blockHeight) {
+                        catapult::plugins::epochFees.insert(it.base(), {blockHeight, collectedFees, currentFee, address});
                     }
                 }
+                return true;
             }
         }
         epochFees.push_back({blockHeight, collectedFees, currentFee, address});
@@ -827,7 +834,6 @@ namespace catapult { namespace plugins {
                 it = decltype(it)(epochFees.erase(std::next(it).base()));
                 CATAPULT_LOG(info) << "Epoch fee entry removed from the list for block " << blockHeight 
                     << ", collectedFees: " << collectedFees << ", feeToPay: " << blockFee << ", address: " << address << "\n";
-                break;
             }
         }
         updateEpochFeeFile(); // update data in the file
