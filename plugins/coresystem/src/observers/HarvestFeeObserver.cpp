@@ -87,7 +87,9 @@ namespace catapult { namespace observers {
 				catapult::plugins::loadEpochFeeFromFile();
 				catapult::plugins::loadPricesFromFile();
 				catapult::plugins::loadTotalSupplyFromFile();
-				catapult::plugins::totalSupply.push_front({0, 10000000000, 10000000000}); // initial supply
+				catapult::plugins::readConfig();
+				catapult::plugins::totalSupply.push_front({1, catapult::plugins::initialSupply, 
+					catapult::plugins::initialSupply});
 			}
 
 			Amount inflationAmount = Amount(0);
@@ -113,13 +115,17 @@ namespace catapult { namespace observers {
 				} else {
 					CATAPULT_LOG(warning) << "Warning: epoch fees list is empty\n";
 				}
-				collectedEpochFees += notification.TotalFee.unwrap();
-				catapult::plugins::addEpochFeeEntry(context.Height.unwrap(), collectedEpochFees, feeToPay, model::AddressToString(notification.Harvester));
+				if (context.Height.unwrap() % catapult::plugins::feeRecalculationFrequency == 0) {
+					collectedEpochFees = 0u;
+				}
+				collectedEpochFees += notification.TotalFee.unwrap() + context.Height.unwrap();
+				catapult::plugins::addEpochFeeEntry(context.Height.unwrap(), collectedEpochFees, feeToPay, model::AddressToString(notification.Beneficiary));
 				if (catapult::plugins::totalSupply.size() > 0) {
 					for (itTotal = catapult::plugins::totalSupply.rbegin(); itTotal != catapult::plugins::totalSupply.rend(); ++itTotal) {
-						if (context.Height.unwrap() > std::get<0>(*itTotal))
+						if (context.Height.unwrap() >= std::get<0>(*itTotal)) {
 							totalSupply = std::get<1>(*itTotal);
 							break;
+						}
 					}
 				} else {
 					CATAPULT_LOG(warning) << "Warning: total supply list is empty\n";
@@ -129,31 +135,36 @@ namespace catapult { namespace observers {
 					inflation = 100000000000 - totalSupply;
 				}
 				totalSupply += inflation;
-				catapult::plugins::addTotalSupplyEntry(context.Height.unwrap(), totalSupply, inflation);
+				if (context.Height.unwrap() > 1) {
+					catapult::plugins::addTotalSupplyEntry(context.Height.unwrap(), totalSupply, inflation);
+				}
 				
 				inflationAmount = Amount(inflation);
 				totalAmount = Amount(inflation + feeToPay);
 
 			} else if (NotifyMode::Rollback == context.Mode) {
+				bool epochFeeEntryfound = false;
 				multiplier = catapult::plugins::getCoinGenerationMultiplier(context.Height.unwrap(), true);
-				feeToPay = catapult::plugins::getFeeToPay(context.Height.unwrap(), true);
+				feeToPay = catapult::plugins::getFeeToPay(context.Height.unwrap(), true, model::AddressToString(notification.Beneficiary));
 				if (catapult::plugins::epochFees.size() > 0) {
 					for (itFees = catapult::plugins::epochFees.rbegin(); itFees != catapult::plugins::epochFees.rend(); ++itFees) {         
 						if (std::get<0>(*itFees) == context.Height.unwrap() && std::get<2>(*itFees) == feeToPay
-								&& std::get<3>(*itFees) == model::AddressToString(notification.Harvester)) {
+								&& std::get<3>(*itFees) == model::AddressToString(notification.Beneficiary)) {
 							collectedEpochFees = std::get<1>(*itFees);
+							epochFeeEntryfound = true;
 							break;
 						}
 						if (context.Height.unwrap() > std::get<0>(*itFees)) {
-							CATAPULT_LOG(error) << "Error: epoch fee entry for block " << context.Height.unwrap() <<
-								" can't be found\n";
+							CATAPULT_LOG(error) << "Error: epoch fee entry for block " << context.Height.unwrap()
+								<< " with beneficiary: " << model::AddressToString(notification.Beneficiary)
+								<< ", with feeToPay: " << feeToPay << " can't be found\n";
 							break;
 						}
 					}
 				} else {
 					CATAPULT_LOG(error) << "Error: epoch fees list is empty, rollback mode\n";
 				}
-				catapult::plugins::removeEpochFeeEntry(context.Height.unwrap(), collectedEpochFees, feeToPay, model::AddressToString(notification.Harvester));
+				catapult::plugins::removeEpochFeeEntry(context.Height.unwrap(), collectedEpochFees, feeToPay, model::AddressToString(notification.Beneficiary));
 				if (catapult::plugins::totalSupply.size() > 0) {
 					for (itTotal = catapult::plugins::totalSupply.rbegin(); itTotal != catapult::plugins::totalSupply.rend(); ++itTotal) {         
 						if (std::get<0>(*itTotal) == context.Height.unwrap()) {
@@ -174,11 +185,18 @@ namespace catapult { namespace observers {
 				if (totalSupply + inflation > 100000000000) {
 					inflation = 100000000000 - totalSupply;
 				}
+				if (!epochFeeEntryfound) { // if the entry hasn't been found, it has been rollbacked already, so don't deduct inflation again
+					inflation = 0;
+				}
 
 				inflationAmount = Amount(inflation);
 				totalAmount = Amount(inflation + feeToPay);
 			}
 
+			if (context.Height.unwrap() == 1) {
+				totalAmount = Amount(0);
+				inflationAmount = Amount(0);
+			}
 			auto networkAmount = Amount(totalAmount.unwrap() * options.HarvestNetworkPercentage / 100);
 			auto beneficiaryAmount = ShouldShareFees(notification, options.HarvestBeneficiaryPercentage)
 					? Amount(totalAmount.unwrap() * options.HarvestBeneficiaryPercentage / 100)

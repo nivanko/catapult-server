@@ -28,12 +28,23 @@
 #include "catapult/crypto/OpensslKeyUtils.h"
 #include "catapult/model/Address.h"
 #include "catapult/plugins/PluginManager.h"
+#include "src/observers/priceUtil.h"
+#include "src/config/PriceConfiguration.h"
+#include <string>
 
 namespace catapult { namespace plugins {
 
 	void RegisterPriceSubsystem(PluginManager& manager) {
+		auto config = catapult::model::LoadPluginConfiguration<config::PriceConfiguration>(manager.config(), "catapult.plugins.price");
+		catapult::plugins::initialSupply = config.initialSupply;
+		catapult::plugins::pricePublisherPublicKey = config.pricePublisherPublicKey;
+		catapult::plugins::feeRecalculationFrequency = config.feeRecalculationFrequency;
+		catapult::plugins::multiplierRecalculationFrequency = config.multiplierRecalculationFrequency;
+		catapult::plugins::pricePeriodBlocks = config.pricePeriodBlocks;
+		configToFile();
+
 		manager.addTransactionSupport(CreatePriceTransactionPlugin());
-    
+
 		manager.addStatelessValidatorHook([](auto& builder) {
 			builder.add(validators::CreatePriceMessageValidator());
 		});
