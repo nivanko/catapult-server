@@ -49,7 +49,6 @@ namespace catapult { namespace plugins {
     NODESTROY std::deque<std::tuple<uint64_t, uint64_t, uint64_t, std::string>> epochFees;
     double currentMultiplier = 1;
     uint64_t feeToPay = 0;
-
     uint64_t initialSupply = 0;
     std::string pricePublisherPublicKey = "";
     uint64_t feeRecalculationFrequency = 0;
@@ -197,7 +196,7 @@ namespace catapult { namespace plugins {
                 feeToPay = 0;
                 return feeToPay;
             }
-            for (it = catapult::plugins::epochFees.rbegin(); it != catapult::plugins::epochFees.rend(); ++it) {         
+            for (it = catapult::plugins::epochFees.rbegin(); it != catapult::plugins::epochFees.rend(); ++it) {
                 if (std::get<0>(*it) == blockHeight && std::get<3>(*it) == beneficiary) {
                     feeToPay = std::get<2>(*it);
                     break;
@@ -804,7 +803,7 @@ namespace catapult { namespace plugins {
             if (previousEntryHeight > blockHeight) {
                 CATAPULT_LOG(warning) << "Warning: epoch fee entry block height is lower to the previous: " <<
                     "Previous height: " << previousEntryHeight << ", current height: " << blockHeight << "\n";
-                
+
                 for (it = catapult::plugins::epochFees.rbegin(); it != catapult::plugins::epochFees.rend(); ++it) {
                     if (std::get<0>(*it) <= blockHeight) {
                         catapult::plugins::epochFees.insert(it.base(), {blockHeight, collectedFees, currentFee, address});
