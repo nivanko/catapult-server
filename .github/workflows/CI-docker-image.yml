@@ -1,0 +1,29 @@
+name: Docker Image CI
+
+# Controls when the workflow will run
+on:
+  push:
+    branches: [ main ]
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python 3.8
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.8
+    - name: Build the Docker image
+      run: |
+        echo "${{ secrets.DOCKER_HUB_TOKEN }}" | docker login -u "${{ secrets.DOCKER_HUB_USERNAME }}" --password-stdin
+        python3 ./scripts/build/runDockerBuild.py \
+          --compiler-configuration ./scripts/build/configurations/gcc-10.yaml \
+          --build-configuration ./scripts/build/configurations/release-private.yaml \
+          --operating-system ubuntu --user "0:0" \
+          --destination-image-label gcc-10-main-${GITHUB_SHA:0:7}
+        docker image tag symbolplatform/symbol-server-private:gcc-10-main-${GITHUB_SHA:0:7} ${{ secrets.DOCKER_HUB_USERNAME }}/${{ secrets.DOCKER_HUB_REPOSITORY }}:gcc-10-main-${GITHUB_SHA:0:7}
+        docker push ${{ secrets.DOCKER_HUB_USERNAME }}/${{ secrets.DOCKER_HUB_REPOSITORY }}:gcc-10-main-${GITHUB_SHA:0:7}
