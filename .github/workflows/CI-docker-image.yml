@@ -21,10 +21,15 @@ jobs:
       run: pip install PyYAML
     - name: Build the Docker image
       run: |
+        id
+        pwd
+        ls
+        cd ..
+        mv catapult-server catapult-src
         echo "${{ secrets.DOCKER_HUB_TOKEN }}" | docker login -u "${{ secrets.DOCKER_HUB_USERNAME }}" --password-stdin
-        sudo python3 ./scripts/build/runDockerBuild.py \
-          --compiler-configuration ./scripts/build/configurations/gcc-10.yaml \
-          --build-configuration ./scripts/build/configurations/release-private.yaml \
+        sudo python3 catapult-src/scripts/build/runDockerBuild.py \
+          --compiler-configuration catapult-src/scripts/build/configurations/gcc-10.yaml \
+          --build-configuration catapult-src/scripts/build/configurations/release-private.yaml \
           --operating-system ubuntu --user "0:0" \
           --destination-image-label gcc-10-main-${GITHUB_SHA:0:7}
         docker image tag symbolplatform/symbol-server-private:gcc-10-main-${GITHUB_SHA:0:7} ${{ secrets.DOCKER_HUB_USERNAME }}/${{ secrets.DOCKER_HUB_REPOSITORY }}:gcc-10-main-${GITHUB_SHA:0:7}
