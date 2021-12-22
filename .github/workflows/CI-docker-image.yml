@@ -18,7 +18,7 @@ jobs:
       with:
         python-version: 3.8
     - name: Install dependencies
-      run: pip install yaml
+      run: pip install PyYAML
     - name: Build the Docker image
       run: |
         echo "${{ secrets.DOCKER_HUB_TOKEN }}" | docker login -u "${{ secrets.DOCKER_HUB_USERNAME }}" --password-stdin
